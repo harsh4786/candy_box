@@ -4,7 +4,7 @@ use anchor_lang::prelude::*;
 use anchor_spl::token::{transfer_checked, Mint, Token, TokenAccount, TransferChecked};
 
 #[derive(Accounts)]
-#[instruction(amount: u64, id: [u8;32])]
+#[instruction(amount: u64)]
 pub struct WithdrawRemaining<'info> {
     #[account(
         has_one = associated_vault,
@@ -12,7 +12,7 @@ pub struct WithdrawRemaining<'info> {
         seeds = [
             SUB_ACC_SEED,
             user_pubkey.key().as_ref(),
-            &id
+            &subscription_account.id
         ],
         bump = subscription_account.bump,
         constraint = subscription_account.subscriber == user_pubkey.key() @ CustomError::InvalidOrUnrelatedSubscriber
@@ -42,6 +42,7 @@ pub fn handler(ctx: Context<WithdrawRemaining>, amount: u64) -> Result<()> {
     let seeds: &[&[&[u8]]; 1] = &[&[
         SUB_ACC_SEED,
         user_pubkey.as_ref(),
+        &subscription_account.id,
         &[subscription_account.bump],
     ]];
     let transfer_ctx = CpiContext::new_with_signer(

@@ -22,7 +22,7 @@ pub struct CancelSubscription<'info> {
     /// CHECK: this is fine
     #[account(mut)]
     pub merchant_ata: AccountInfo<'info>,
-
+    /// CHECK: this is fine
     #[account(mut)]
     pub user_pubkey: AccountInfo<'info>,
 
