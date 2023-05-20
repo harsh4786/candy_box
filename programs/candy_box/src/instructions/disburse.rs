@@ -48,6 +48,7 @@ pub struct Disburse<'info> {
 pub fn handler(ctx: Context<Disburse>) -> Result<ThreadResponse> {
     msg!("starting instruction");
     let subscription_account = &mut ctx.accounts.subscription_account;
+    let price = subscription_account.price;
     let clock = Clock::get()?;
     let user_pubkey = ctx.accounts.user_pubkey.key();
 
@@ -79,7 +80,7 @@ pub fn handler(ctx: Context<Disburse>) -> Result<ThreadResponse> {
         );
         transfer_checked(
             transfer_ctx,
-            ctx.accounts.subscription_vault.amount,
+            price, // Price that was set when the subscription was initiated.
             ctx.accounts.mint.decimals,
         )?;
         emit!(Disbursed{
