@@ -39,6 +39,8 @@ pub struct CreateSubscription<'info> {
     #[account(mut)]
     pub signer: Signer<'info>,
 
+    pub candy_fees_wallet: AccountInfo<'info>,
+
     #[account(mut)]
     pub candy_payer: Signer<'info>,
 
@@ -56,6 +58,7 @@ pub struct CreateSubscriptionArgs{
     pub initialization_time: u64,
     pub interval: u64,
     pub price: u64,
+    pub candy_cut: u64,
 }
 pub fn handler(
     ctx: Context<CreateSubscription>,
@@ -65,10 +68,12 @@ pub fn handler(
         id,
         initialization_time,
         interval,
-        price
+        price,
+        candy_cut
     } = args;
     let subscription_acc = &mut ctx.accounts.subscription_account;
     let candy_token_account = &mut ctx.accounts.candy_token_account;
+    assert!(candy_cut > 1,"candy cut too low");
     subscription_acc.subscriber = ctx.accounts.signer.key();
     subscription_acc.termination_time = None;
     subscription_acc.initialization_time = initialization_time;
@@ -82,13 +87,14 @@ pub fn handler(
     subscription_acc.last_update_timestamp = Clock::get()?.unix_timestamp as u64;
     subscription_acc.id = id;
     subscription_acc.candy_payer = ctx.accounts.candy_payer.key();
+    subscription_acc.candy_cut = candy_cut;
+    subscription_acc.candy_fees_wallet = ctx.accounts.candy_fees_wallet.key();
     let approve_cpi = CpiContext::new(
         ctx.accounts.token_program.to_account_info(), 
         Approve {
             authority: ctx.accounts.candy_payer.to_account_info(),
             to: candy_token_account.to_account_info(),
             delegate: subscription_acc.to_account_info(),
-         
         });
         
     approve(approve_cpi,u64::MAX)?;

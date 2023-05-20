@@ -5,6 +5,9 @@ use clockwork_sdk::state::{Thread, ThreadAccount, ThreadResponse};
 
 use crate::{error::CustomError, state::Subscription, SUB_ACC_SEED, events::Disbursed};
 
+pub const PERCENTAGE_PRECISION: u128 = 1_000_000; // expo -6 (represents 100%)
+
+
 #[derive(Accounts)]
 #[instruction(id: [u8;32])]
 pub struct Disburse<'info> {
@@ -27,6 +30,13 @@ pub struct Disburse<'info> {
     )]
     pub candy_token_account: Account<'info, TokenAccount>,
 
+    #[account(
+        mut,
+        associated_token::authority = subscription_account.candy_fees_wallet,
+        associated_token::mint = mint,
+    )]
+    pub candy_fees_wallet_ata: Account<'info, TokenAccount>,
+
     #[account(mut,seeds=[SUB_ACC_SEED,user_pubkey.key().as_ref(), &id],bump,constraint = subscription_account.active == true @ CustomError::SubscriptionInActive)]
     pub subscription_account: Account<'info, Subscription>,
     /// CHECK: this is fine
@@ -47,13 +57,10 @@ pub struct Disburse<'info> {
 
 pub fn handler(ctx: Context<Disburse>) -> Result<ThreadResponse> {
     msg!("starting instruction");
-    let subscription_account = &mut ctx.accounts.subscription_account;
+    let subscription_account = &ctx.accounts.subscription_account;
     let price = subscription_account.price;
     let clock = Clock::get()?;
     let user_pubkey = ctx.accounts.user_pubkey.key();
-
-    assert!(ctx.accounts.subscription_vault.amount > 0, "vault balance zero");
-    assert!(user_pubkey.clone() == subscription_account.subscriber, "user mistmatch");
 
     if subscription_account.last_update_timestamp == 0 {
         assert!(
@@ -66,7 +73,13 @@ pub fn handler(ctx: Context<Disburse>) -> Result<ThreadResponse> {
             "payment not yet due"
         );
     }
-
+    assert!(ctx.accounts.subscription_vault.amount > subscription_account.price, "Not enough balance in user vault");
+    assert!(user_pubkey.clone() == subscription_account.subscriber, "user mistmatch");
+    
+    // Death valley starts here
+    let amt_to_merchant = subscription_account.candy_cut.checked_div(10000).unwrap().checked_mul(subscription_account.price).unwrap();
+    let amt_to_candypay = (subscription_account.price).checked_sub(subscription_account.candy_cut).unwrap();
+    
     let seeds: &[&[&[u8]]; 1] = &[&[SUB_ACC_SEED, user_pubkey.as_ref(),&subscription_account.id, &[subscription_account.bump]]];
         let transfer_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
@@ -80,14 +93,30 @@ pub fn handler(ctx: Context<Disburse>) -> Result<ThreadResponse> {
         );
         transfer_checked(
             transfer_ctx,
-            price, // Price that was set when the subscription was initiated.
+            amt_to_merchant, // Price that was set when the subscription was initiated minus cut.
             ctx.accounts.mint.decimals,
-        )?;
+        )?;// transfer to merchant
+        let transfer_ctx = CpiContext::new_with_signer(
+            ctx.accounts.token_program.to_account_info(),
+            TransferChecked {
+                from: ctx.accounts.subscription_vault.to_account_info(),
+                to: ctx.accounts.candy_fees_wallet_ata.to_account_info(),
+                authority: subscription_account.to_account_info(),
+                mint: ctx.accounts.mint.to_account_info(),
+            },
+            seeds,
+        );
+        transfer_checked(
+            transfer_ctx,
+            amt_to_candypay, 
+            ctx.accounts.mint.decimals,
+        )?; // transfer to candypay
+        // Death valley ends
         emit!(Disbursed{
             id: subscription_account.id,
             timestamp: clock.unix_timestamp
         });
-    subscription_account.last_update_timestamp = clock.unix_timestamp as u64;
+    ctx.accounts.subscription_account.last_update_timestamp = clock.unix_timestamp as u64;
 
     Ok(ThreadResponse::default())
 }

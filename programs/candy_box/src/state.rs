@@ -1,22 +1,5 @@
 use anchor_lang::prelude::*;
 
-// #[derive(AnchorSerialize, AnchorDeserialize, Debug, Clone)]
-// pub enum TimeInterval{
-//     Weekly,
-//     Monthly,
-//     Yearly,
-// }
-
-// #[account]
-// #[derive(Debug)]
-// pub struct SubscriptionPlan{
-//     pub price: u64,
-//     pub interval: u64,
-//     pub accepting_new_subs: bool,
-//     pub active: bool,
-//     pub name: String,
-// }
-
 #[account]
 #[derive(Debug, Default)]
 pub struct Subscription {
@@ -29,7 +12,9 @@ pub struct Subscription {
     pub termination_time: Option<u64>,
     pub last_update_timestamp: u64,
     pub candy_payer: Pubkey,
-    //  pub credit_counter: u64,
+    /// in bps 1% = 100bps
+    pub candy_cut: u64,
+    pub candy_fees_wallet: Pubkey,
     pub active: bool,
     pub bump: u8,
     pub price: u64,
@@ -38,5 +23,5 @@ pub struct Subscription {
 
 pub const SUB_ACC_SEED: &[u8] = b"subscription".as_slice();
 impl Subscription {
-    pub const LEN: usize = std::mem::size_of::<Self>();
+    pub const LEN: usize = 8 + std::mem::size_of::<Self>();
 }
