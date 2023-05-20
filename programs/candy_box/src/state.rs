@@ -14,7 +14,7 @@ pub struct Subscription {
     pub candy_payer: Pubkey,
     /// in bps 1% = 100bps
     pub candy_cut: u64,
-    pub candy_fees_wallet: Pubkey,
+    pub candy_bank_wallet: Pubkey,
     pub active: bool,
     pub bump: u8,
     pub price: u64,

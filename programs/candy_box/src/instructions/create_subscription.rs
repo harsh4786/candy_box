@@ -28,7 +28,8 @@ pub struct CreateSubscription<'info> {
 
     #[account(
         init, 
-        payer = signer,seeds=[SUB_ACC_SEED,signer.key().as_ref(),&id],
+        payer = signer,
+        seeds=[SUB_ACC_SEED,signer.key().as_ref(),&id],
         bump, 
         space = Subscription::LEN,
     )]
@@ -38,8 +39,9 @@ pub struct CreateSubscription<'info> {
 
     #[account(mut)]
     pub signer: Signer<'info>,
-
-    pub candy_fees_wallet: AccountInfo<'info>,
+    
+    /// CHECK: this is okay
+    pub candy_bank_wallet: AccountInfo<'info>,
 
     #[account(mut)]
     pub candy_payer: Signer<'info>,
@@ -52,7 +54,7 @@ pub struct CreateSubscription<'info> {
 
     pub system_program: Program<'info, System>,
 }
-#[derive(AnchorDeserialize, AnchorSerialize, Clone)]
+#[derive(AnchorSerialize, AnchorDeserialize, Default, Clone)]
 pub struct CreateSubscriptionArgs{
     pub id: [u8; 32],
     pub initialization_time: u64,
@@ -88,7 +90,7 @@ pub fn handler(
     subscription_acc.id = id;
     subscription_acc.candy_payer = ctx.accounts.candy_payer.key();
     subscription_acc.candy_cut = candy_cut;
-    subscription_acc.candy_fees_wallet = ctx.accounts.candy_fees_wallet.key();
+    subscription_acc.candy_bank_wallet = ctx.accounts.candy_bank_wallet.key();
     let approve_cpi = CpiContext::new(
         ctx.accounts.token_program.to_account_info(), 
         Approve {

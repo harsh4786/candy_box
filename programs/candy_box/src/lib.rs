@@ -2,8 +2,9 @@ use anchor_lang::prelude::*;
 mod error;
 mod events;
 mod instructions;
+pub mod math;
 mod state;
-declare_id!("Fg6PaFpoGXkYsidMpWTK6W2BeZ7FEfcYkg476zPFsLnS");
+declare_id!("CD8QX7UQSSHWzKbZbMGVbqVnGqiJWqupjdDMHwyvchbR");
 
 pub const SUB_ACC_SEED: &[u8] = b"subscription";
 use instructions::*;
@@ -14,7 +15,7 @@ pub mod candy_box {
 
     pub fn create_subscription(
         ctx: Context<CreateSubscription>,
-        args: create_subscription::CreateSubscriptionArgs,
+        args: CreateSubscriptionArgs,
     ) -> Result<()> {
         create_subscription::handler(ctx, args)
     }
