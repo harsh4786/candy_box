@@ -18,6 +18,10 @@ pub enum CustomError {
     InvalidOrUnrelatedSubscriber,
     #[msg("Insufficient funds to withdraw")]
     InsufficientWithdrawableAmount,
+    #[msg("Math Error: Casting Failure")]
+    FailedToCast,
+    #[msg("Math Error: arithmetic overflow!")]
+    MathOverflow,
 }
 
 #[macro_export]

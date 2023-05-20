@@ -2,7 +2,7 @@ use crate::{
     events::SubscriptionCreated,
     state::{Subscription, SUB_ACC_SEED},
 };
-use anchor_lang::{prelude::*};
+use anchor_lang::prelude::*;
 use anchor_spl::{token::{Mint, Token, TokenAccount, Approve, approve}, associated_token::AssociatedToken};
 
 
@@ -60,7 +60,7 @@ pub struct CreateSubscriptionArgs{
     pub initialization_time: u64,
     pub interval: u64,
     pub price: u64,
-    pub candy_cut: u64,
+    pub candy_cut: u32,
 }
 pub fn handler(
     ctx: Context<CreateSubscription>,

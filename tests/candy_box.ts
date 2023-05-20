@@ -1,5 +1,5 @@
 import * as anchor from "@project-serum/anchor";
-import { Program, ProgramError } from "@project-serum/anchor";
+import { AnchorProvider, Program, ProgramError } from "@project-serum/anchor";
 import NodeWallet from "@project-serum/anchor/dist/cjs/nodewallet";
 import {
   createMint,
@@ -8,16 +8,31 @@ import {
   TOKEN_PROGRAM_ID,
   ASSOCIATED_TOKEN_PROGRAM_ID,
   getAssociatedTokenAddressSync,
+  transfer,
+  transferChecked,
+  getOrCreateAssociatedTokenAccount,
 } from "@solana/spl-token";
 import {
   Keypair,
+  LAMPORTS_PER_SOL,
   PublicKey,
+  Signer,
   SystemProgram,
   SYSVAR_CLOCK_PUBKEY,
+  SYSVAR_RENT_PUBKEY,
 } from "@solana/web3.js";
 import { assert } from "chai";
 import { CandyBox } from "../target/types/candy_box";
-import { airDropSol, sleep } from "./utils";
+import {
+  airDropSol,
+  BN,
+  bps,
+  calculateCutWithBps,
+  Cluster,
+  print_thread,
+  sleep,
+  verifyAmount,
+} from "./utils";
 import { ClockworkProvider, PAYER_PUBKEY } from "@clockwork-xyz/sdk";
 describe("candy_box", () => {
   // Configure the client to use the local cluster.
@@ -31,6 +46,7 @@ describe("candy_box", () => {
   const trigger_key = Keypair.generate();
   const user = new NodeWallet(payer);
   const connection = program.provider.connection;
+  console.log("Connection: ", connection.rpcEndpoint);
   let user_ata: PublicKey;
   const merchant = Keypair.generate();
   let merchant_ata: PublicKey;
@@ -39,16 +55,37 @@ describe("candy_box", () => {
   let candyTokenAccount: PublicKey;
   let subscription_vault = Keypair.generate();
   const candy_bank_wallet = Keypair.generate();
+  let candy_bank_wallet_ata: PublicKey;
   const candy_payer = Keypair.generate();
   let interval = new anchor.BN(5); // 5 seconds
   let decimals = 6; // USDC decimals
-  let price = new anchor.BN(0.1 * 10 ** decimals); // 0.1 SPL
+  let price = new anchor.BN(8 * 10 ** decimals); // 0.1 SPL
   let id = anchor.web3.Keypair.generate().publicKey.toBuffer();
-  let candyCut = new anchor.BN(0.5 * 100); // 0.1 SPL
+  // let candyCut = new anchor.BN(0.5 * 100);
+  let candyCut = 0.5 * 100; // 0.5 %
+  const cronExpression = "0/5 0 0 ? * * *";
+  // let subscriptionTest = {
+  //   price: 8, // USDC
+  //   interval: 5, // seconds
+  //   endTime: 0, // unix timestamp
+  //   candyCut: bps(0.05), // 0.5%
+  //   vaultDeposit:
+  // };
+  const provider = anchor.AnchorProvider.env();
+  const clockworkProvider = new ClockworkProvider(
+    provider.wallet,
+    provider.connection
+  );
+  const cluster = Cluster.TESTNET;
   before("setup", async () => {
+    console.log("Setting up...");
     await airDropSol(user.publicKey, 10);
+    await sleep(10000);
     await airDropSol(merchant.publicKey, 10);
+    await sleep(10000);
     await airDropSol(candy_payer.publicKey, 10);
+    await sleep(10000);
+    await airDropSol(candy_bank_wallet.publicKey, 10);
     mint = await createMint(
       connection,
       payer,
@@ -64,7 +101,7 @@ describe("candy_box", () => {
       mint,
       user_ata,
       user.publicKey,
-      10 * 10 ** decimals
+      200 * 10 ** decimals
     );
     console.log("mintTo1: ", tx1);
 
@@ -80,7 +117,7 @@ describe("candy_box", () => {
       mint,
       merchant_ata,
       user.publicKey,
-      10 * 10 ** decimals
+      200 * 10 ** decimals
     );
     console.log("mintTo2: ", tx2);
 
@@ -89,10 +126,22 @@ describe("candy_box", () => {
       program.programId
     )[0];
 
-    candyTokenAccount = getAssociatedTokenAddressSync(
-      mint,
-      candy_payer.publicKey
-    );
+    candyTokenAccount = (
+      await getOrCreateAssociatedTokenAccount(
+        connection,
+        candy_payer,
+        mint,
+        candy_payer.publicKey
+      )
+    ).address;
+    candy_bank_wallet_ata = (
+      await getOrCreateAssociatedTokenAccount(
+        connection,
+        candy_bank_wallet,
+        mint,
+        candy_bank_wallet.publicKey
+      )
+    ).address;
     console.log("mint: ", mint.toBase58());
     console.log("mint_keypair: ", mint_keypair.publicKey.toBase58());
     console.log("user_ata: ", user_ata.toBase58());
@@ -106,9 +155,13 @@ describe("candy_box", () => {
     console.log("merchant: ", merchant.publicKey.toBase58());
     console.log("payer: ", payer.publicKey.toBase58());
     console.log("subscription id: ", id.toString("hex"));
+    console.log("candyTokenAccount: ", candyTokenAccount.toBase58());
+    console.log("candy_bank_wallet_ata: ", candy_bank_wallet_ata.toBase58());
+    console.log("candy_payer: ", candy_payer.publicKey.toBase58());
+    console.log("candy_bank_wallet: ", candy_bank_wallet.publicKey.toBase58());
   });
 
-  it("Is initialized!", async () => {
+  it("User creates subscription for 1 year", async () => {
     let initializationTime = new anchor.BN(Date.now() / 1000);
     let args = {
       id: [...Uint8Array.from(id)],
@@ -136,61 +189,168 @@ describe("candy_box", () => {
       .rpc();
     console.log(
       "Your transaction signature",
-      `https://explorer.solana.com/tx/${tx}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`
+      `https://explorer.solana.com/tx/${tx}?cluster=${cluster}`
     );
   });
-  it.skip("deposts into the vault", async () => {
-    let tx = await mintTo(
+  it("User deposits 96 USDC into the vault", async () => {
+    let tx = await transferChecked(
       connection,
       payer,
+      user_ata,
       mint,
       subscription_vault.publicKey,
       user.publicKey,
-      10 * 10 ** 6
-    ); // minting instead of transfer cost for some reason transfer doesnt work
+      96 * 10 ** decimals,
+      decimals
+    );
     console.log(
       "Desposit into vault",
-      `https://explorer.solana.com/tx/${tx}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`
+      `https://explorer.solana.com/tx/${tx}?cluster=${cluster}`
     );
   });
-  it.skip("can trigger a subscription", async () => {
-    await sleep(5000);
-    await airDropSol(trigger_key.publicKey, 10);
-    const tx = "";
-
-    console.log(
-      "Your transaction signature",
-      `https://explorer.solana.com/tx/${tx}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`
+  it("creates the clockwork thread to start the subscription", async () => {
+    const thread = await createDisbursePaymentThread(
+      clockworkProvider,
+      candy_payer,
+      program,
+      merchant_ata,
+      candyTokenAccount,
+      subscription_vault,
+      subscription_account,
+      mint,
+      candy_bank_wallet_ata,
+      cronExpression,
+      cluster
     );
-  });
-  it.skip("can trigger a subscription again", async () => {
-    await sleep(5000);
-    await airDropSol(trigger_key.publicKey, 10);
-    const tx = "";
-    console.log(
-      "Your transaction signature",
-      `https://explorer.solana.com/tx/${tx}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`
+    console.log("Thread created: ", thread.toBase58());
+    await waitForThreadExec(clockworkProvider, thread);
+    let merchantShouldReceive = price.sub(
+      BN(calculateCutWithBps(price, candyCut))
     );
-  });
-  it.skip("cannot trigger a subscription because payment not due", async () => {
-    // await sleep(5000);
-    await airDropSol(trigger_key.publicKey, 10);
-    try {
-      const tx = "";
-      console.log(
-        "Your transaction signature",
-        `https://explorer.solana.com/tx/${tx}?cluster=custom&customUrl=http%3A%2F%2Flocalhost%3A8899`
-      );
-    } catch (error) {
-      if (
-        (error as ProgramError).logs.find((x) =>
-          x.includes("payment not yet due")
-        ).length > 0
-      ) {
-        assert.ok(true);
-      } else {
-        assert.ok(false);
-      }
-    }
+    const merchantAmt = verifyAmount(
+      connection,
+      merchant_ata,
+      merchantShouldReceive
+    );
+    console.log("Merchant has received amount: ", merchantAmt);
+    const candyPayAmt = verifyAmount(
+      connection,
+      candy_bank_wallet_ata,
+      BN(calculateCutWithBps(price, candyCut))
+    );
+    console.log("CandyPay has received amount: ", candyPayAmt);
   });
 });
+
+const createDisbursePaymentThread = async (
+  clockworkProvider: ClockworkProvider,
+  candy_payer: anchor.web3.Keypair,
+  program: anchor.Program<CandyBox>,
+  merchant_ata: anchor.web3.PublicKey,
+  candyTokenAccount: anchor.web3.PublicKey,
+  subscription_vault: anchor.web3.Keypair,
+  subscription_account: anchor.web3.PublicKey,
+  mint: anchor.web3.PublicKey,
+  candy_bank_wallet_ata: anchor.web3.PublicKey,
+  cronExpression: string,
+  cluster: Cluster
+) => {
+  const threadId = "subscription_thread";
+  // For debug: use a fix thread id such as the above, when your code works!
+  const date = new Date();
+  // const threadId =
+  //   "subscription_" +
+  //   date.toLocaleDateString() +
+  //   "-" +
+  //   date.getHours() +
+  //   ":" +
+  //   date.getMinutes();
+
+  // Security:
+  // Note that we are using your default Solana paper keypair as the thread authority.
+  // Feel free to use whichever authority is appropriate for your use case.
+  const threadAuthority = candy_payer.publicKey;
+  const [threadAddress] = clockworkProvider.getThreadPDA(
+    threadAuthority,
+    threadId
+  );
+  console.log("threadAddress", threadAddress.toBase58());
+  // https://docs.rs/clockwork-utils/latest/clockwork_utils/static.PAYER_PUBKEY.html
+  const clockwork_payer = PAYER_PUBKEY;
+
+  const targetIx = await program.methods
+    .disburse()
+    .accounts({
+      mint: mint,
+      subscriptionVault: subscription_vault.publicKey,
+      subscriptionAccount: subscription_account,
+      merchantAta: merchant_ata,
+      thread: threadAddress,
+      signer: clockwork_payer,
+      candyBankWalletAta: candy_bank_wallet_ata,
+      candyTokenAccount,
+      tokenProgram: TOKEN_PROGRAM_ID,
+      associatedTokenProgram: ASSOCIATED_TOKEN_PROGRAM_ID,
+      threadProgram: clockworkProvider.threadProgram.programId,
+    })
+    .instruction();
+
+  const trigger = {
+    cron: {
+      schedule: cronExpression,
+      skippable: false,
+    },
+  };
+
+  // 💰 Top-up the thread with this amount of SOL to spend
+  // Each tx ran by your thread will cost 1000 LAMPORTS
+  const threadSOLBudget = LAMPORTS_PER_SOL;
+  console.log("threadSOLBudget", threadSOLBudget);
+  let ix = await clockworkProvider.threadCreate(
+    threadAuthority,
+    threadId,
+    [targetIx],
+    trigger,
+    threadSOLBudget
+  );
+  const tx = new anchor.web3.Transaction().add(ix);
+  const signature = await clockworkProvider.anchorProvider.sendAndConfirm(tx, [
+    candy_payer,
+  ]);
+  console.log(
+    "Your transaction signature",
+    `https://explorer.solana.com/tx/${signature}?cluster=${cluster}`
+  );
+  await print_thread(clockworkProvider, threadAddress, cluster);
+  return threadAddress;
+};
+let lastThreadExec = BN(0);
+const waitForThreadExec = async (
+  clockworkProvider: ClockworkProvider,
+  thread: PublicKey,
+  maxWait: number = 60
+) => {
+  let i = 1;
+  while (true) {
+    console.log(
+      "Waiting for thread to execute...",
+      clockworkProvider.anchorProvider.connection.rpcEndpoint
+    );
+    let account = await clockworkProvider.getThreadAccount(thread);
+    console.log("execContext", account);
+    const execContext = account.execContext;
+
+    if (execContext) {
+      if (
+        lastThreadExec.toString() == "0" ||
+        execContext.lastExecAt.gtn(lastThreadExec.toNumber())
+      ) {
+        lastThreadExec = execContext.lastExecAt;
+        break;
+      }
+    }
+    if (i == maxWait) throw Error("Timeout");
+    i += 1;
+    await new Promise((r) => setTimeout(r, i * 1000));
+  }
+};

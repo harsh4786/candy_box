@@ -12,8 +12,9 @@ pub struct Subscription {
     pub termination_time: Option<u64>,
     pub last_update_timestamp: u64,
     pub candy_payer: Pubkey,
-    /// in bps 1% = 100bps
-    pub candy_cut: u64,
+    /// fee percentage 1% = 100Bps,
+    /// enter Bps value here
+    pub candy_cut: u32,
     pub candy_bank_wallet: Pubkey,
     pub active: bool,
     pub bump: u8,

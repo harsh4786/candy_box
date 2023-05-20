@@ -1,14 +1,14 @@
 use anchor_lang::{prelude::*};
 
 use anchor_spl::{token::{Mint, Token, TokenAccount, TransferChecked,transfer_checked}, associated_token::AssociatedToken};
-use clockwork_sdk::state::{Thread, ThreadAccount, ThreadResponse};
+use clockwork_sdk::{state::{Thread, ThreadAccount, ThreadResponse}, ThreadProgram};
 
 use crate::{error::CustomError, state::Subscription, SUB_ACC_SEED, events::Disbursed};
 
 use crate::math::{
-    PERCENTAGE_PRECISION,
-    FEE_PERCENTAGE_DENOMINATOR,
-    ONE_BPS_DENOMINATOR,
+    BPS_DENOMINATOR,
+    calculate_taker_fee,
+    FeeConfig,
 };
 
 #[derive(Accounts)]
@@ -16,6 +16,7 @@ use crate::math::{
 pub struct Disburse<'info> {
     #[account(constraint = mint.key() == subscription_account.mint @ CustomError::InvalidMint)]
     pub mint: Account<'info, Mint>,
+
     #[account(mut)]
     pub subscription_vault: Box<Account<'info, TokenAccount>>,
 
@@ -40,16 +41,19 @@ pub struct Disburse<'info> {
     )]
     pub candy_bank_wallet_ata: Account<'info, TokenAccount>,
 
-    #[account(mut,seeds=[SUB_ACC_SEED,user_pubkey.key().as_ref(), &id],bump,constraint = subscription_account.active == true @ CustomError::SubscriptionInActive)]
+    #[account(mut,seeds=[SUB_ACC_SEED,subscription_account.subscriber.key().as_ref(), &id],bump,constraint = subscription_account.active == true @ CustomError::SubscriptionInActive)]
     pub subscription_account: Account<'info, Subscription>,
     /// CHECK: this is fine
     #[account(mut, constraint = *merchant_ata.owner == subscription_account.merchant @ CustomError::ATAMismatch)]
     pub merchant_ata: AccountInfo<'info>,
 
-    /// CHECK: this is fine
-    pub user_pubkey: AccountInfo<'info>,
+    // /// CHECK: this is fine
+    // pub user_pubkey: AccountInfo<'info>,
 
     pub signer: Signer<'info>,
+    
+    #[account(address = ThreadProgram::id())]
+    pub thread_program: Program<'info, ThreadProgram>,
     
     #[account(address = anchor_spl::token::ID)]
     pub token_program: Program<'info, Token>,
@@ -58,12 +62,12 @@ pub struct Disburse<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub fn handler(ctx: Context<Disburse>) -> Result<ThreadResponse> {
+pub fn handler(ctx: Context<Disburse>, ) -> Result<ThreadResponse> {
     msg!("starting instruction");
     let subscription_account = &ctx.accounts.subscription_account;
     let price = subscription_account.price;
     let clock = Clock::get()?;
-    let user_pubkey = ctx.accounts.user_pubkey.key();
+    // let user_pubkey = ctx.accounts.user_pubkey.key();
 
     if subscription_account.last_update_timestamp == 0 {
         assert!(
@@ -77,13 +81,15 @@ pub fn handler(ctx: Context<Disburse>) -> Result<ThreadResponse> {
         );
     }
     assert!(ctx.accounts.subscription_vault.amount > price, "Not enough balance in user vault");
-    assert!(user_pubkey.clone() == subscription_account.subscriber, "user mistmatch");
+    // assert!(user_pubkey.clone() == subscription_account.subscriber, "user mistmatch");
     
     // Death valley starts here
-    let amt_to_merchant = subscription_account.candy_cut.checked_div(10000).unwrap().checked_mul(price).unwrap();
-    let amt_to_candypay = (price).checked_sub(subscription_account.candy_cut).unwrap();
-    
-    let seeds: &[&[&[u8]]; 1] = &[&[SUB_ACC_SEED, user_pubkey.as_ref(),&subscription_account.id, &[subscription_account.bump]]];
+    // TODO: test this out
+    let fee_config = FeeConfig::new(subscription_account.candy_cut, BPS_DENOMINATOR);
+    let candypay_cut = calculate_taker_fee(price, &fee_config).unwrap();
+    let amt_to_merchant = price.checked_sub(candypay_cut).unwrap();
+
+    let seeds: &[&[&[u8]]; 1] = &[&[SUB_ACC_SEED, subscription_account.subscriber.as_ref(),&subscription_account.id, &[subscription_account.bump]]];
         let transfer_ctx = CpiContext::new_with_signer(
             ctx.accounts.token_program.to_account_info(),
             TransferChecked {
@@ -94,6 +100,7 @@ pub fn handler(ctx: Context<Disburse>) -> Result<ThreadResponse> {
             },
             seeds,
         );
+       
         transfer_checked(
             transfer_ctx,
             amt_to_merchant, // Price that was set when the subscription was initiated minus cut.
@@ -111,7 +118,7 @@ pub fn handler(ctx: Context<Disburse>) -> Result<ThreadResponse> {
         );
         transfer_checked(
             transfer_ctx,
-            amt_to_candypay, 
+            candypay_cut, 
             ctx.accounts.mint.decimals,
         )?; // transfer to candypay
         // Death valley ends

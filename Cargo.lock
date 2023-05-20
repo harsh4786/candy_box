@@ -527,6 +527,7 @@ dependencies = [
  "anchor-lang",
  "anchor-spl",
  "clockwork-sdk",
+ "num-traits",
 ]
 
 [[package]]

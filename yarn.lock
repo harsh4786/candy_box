@@ -14,13 +14,13 @@ __metadata:
   languageName: node
   linkType: hard
 
-"@clockwork-xyz/sdk@npm:^0.3.4":
-  version: 0.3.4
-  resolution: "@clockwork-xyz/sdk@npm:0.3.4"
+"@clockwork-xyz/sdk@npm:0.3.0":
+  version: 0.3.0
+  resolution: "@clockwork-xyz/sdk@npm:0.3.0"
   dependencies:
     "@coral-xyz/anchor": ^0.26.0
     "@solana/web3.js": ^1.73.2
-  checksum: 4efed5407ac333c85697831f71729b252d1e4a03239a50055580e6635d12bc7c6063f2b97659407d9606953b44492ef2454dcc7dc079299a32f934132784ea2d
+  checksum: f47d8a5589ddb755c7b1dbd98cddbc55a8822172b3c80dc09c5d8e179a9f522ec08006e63a59059d20e795e979ecb894859ad53d4d68bd567c2f9c7637e7e737
   languageName: node
   linkType: hard
 
@@ -1828,7 +1828,7 @@ __metadata:
   version: 0.0.0-use.local
   resolution: "root-workspace-0b6124@workspace:."
   dependencies:
-    "@clockwork-xyz/sdk": ^0.3.4
+    "@clockwork-xyz/sdk": 0.3.0
     "@project-serum/anchor": ^0.26.0
     "@solana/spl-token": ^0.3.7
     "@solana/web3.js": ^1.76.0
