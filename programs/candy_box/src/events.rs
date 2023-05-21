@@ -24,4 +24,6 @@ pub struct SubscriptionCancelled {
 pub struct Disbursed {
     pub id: [u8; 32],
     pub timestamp: i64,
+    pub vault_balance: u64,
+    pub subscription_price: u64,
 }

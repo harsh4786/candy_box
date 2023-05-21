@@ -1,0 +1,31 @@
+#! /bin/bash
+mkdir -p wallets
+
+fund(){
+    address=AwvAda3kNWyXxBBe86n4q4SDBURTAbgr6pozNhr9jtBG
+    key="wallets/airdrop$i.json"
+    solana-keygen new -o $key
+    solana config set --keypair $key
+    sleep 2
+    solana airdrop 2
+    solana transfer $address $(awk "BEGIN {print 2-0.001}")
+}
+
+cleanup(){
+echo "should I cleanup (yes/No)?"
+
+read cleanup
+
+if [ "$cleanup" == "yes" ]; then
+    rm wallets/airdrop*.json
+fi
+}
+
+for i in $(seq 1 2)
+do
+    fund
+done
+
+solana config set --keypair tests/id.json
+
+cleanup

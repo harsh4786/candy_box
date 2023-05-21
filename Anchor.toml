@@ -14,7 +14,7 @@ candy_box = "CD8QX7UQSSHWzKbZbMGVbqVnGqiJWqupjdDMHwyvchbR"
 url = "https://api.apr.dev"
 
 [provider]
-cluster = "Localnet"
+cluster = "Devnet"
 wallet = "tests/id.json"
 
 [scripts]

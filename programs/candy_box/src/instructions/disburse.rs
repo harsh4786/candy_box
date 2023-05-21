@@ -32,20 +32,25 @@ pub struct Disburse<'info> {
         associated_token::authority = subscription_account.candy_payer,
         associated_token::mint = mint,
     )]
-    pub candy_token_account: Account<'info, TokenAccount>,
+    pub candy_token_account: Box<Account<'info, TokenAccount>>,
 
     #[account(
         mut,
         associated_token::authority = subscription_account.candy_bank_wallet,
         associated_token::mint = mint,
     )]
-    pub candy_bank_wallet_ata: Account<'info, TokenAccount>,
+    pub candy_bank_wallet_ata: Box<Account<'info, TokenAccount>>,
 
     #[account(mut,seeds=[SUB_ACC_SEED,subscription_account.subscriber.key().as_ref(), &id],bump,constraint = subscription_account.active == true @ CustomError::SubscriptionInActive)]
     pub subscription_account: Account<'info, Subscription>,
     /// CHECK: this is fine
-    #[account(mut, constraint = *merchant_ata.owner == subscription_account.merchant @ CustomError::ATAMismatch)]
-    pub merchant_ata: AccountInfo<'info>,
+    // #[account(mut, constraint = *merchant_ata.owner == subscription_account.merchant @ CustomError::ATAMismatch)]
+    #[account(
+        mut,
+        associated_token::authority = subscription_account.merchant,
+        associated_token::mint = mint,
+    )]
+    pub merchant_ata: Box<Account<'info,TokenAccount>>,
 
     // /// CHECK: this is fine
     // pub user_pubkey: AccountInfo<'info>,
@@ -62,7 +67,7 @@ pub struct Disburse<'info> {
     pub associated_token_program: Program<'info, AssociatedToken>,
 }
 
-pub fn handler(ctx: Context<Disburse>, ) -> Result<ThreadResponse> {
+pub fn handler(ctx: Context<Disburse>, id: [u8;32] ) -> Result<ThreadResponse> {
     msg!("starting instruction");
     let subscription_account = &ctx.accounts.subscription_account;
     let price = subscription_account.price;
@@ -124,7 +129,9 @@ pub fn handler(ctx: Context<Disburse>, ) -> Result<ThreadResponse> {
         // Death valley ends
         emit!(Disbursed{
             id: subscription_account.id,
-            timestamp: clock.unix_timestamp
+            timestamp: clock.unix_timestamp,
+            vault_balance: ctx.accounts.subscription_vault.amount,
+            subscription_price: price
         });
     ctx.accounts.subscription_account.last_update_timestamp = clock.unix_timestamp as u64;
 

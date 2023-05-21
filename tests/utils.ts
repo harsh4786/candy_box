@@ -3,21 +3,44 @@ import {
   Connection,
   LAMPORTS_PER_SOL,
   clusterApiUrl,
+  Keypair,
+  Transaction,
+  SystemProgram,
+  sendAndConfirmTransaction,
 } from "@solana/web3.js";
 import * as anchor from "@project-serum/anchor";
-import { getAccount } from "@solana/spl-token";
+import { getAccount, transfer } from "@solana/spl-token";
 import { assert } from "chai";
+import fs from "fs";
 export const airDropSol = async (to: PublicKey, amt?: number) => {
   try {
-    const connection = new Connection(clusterApiUrl("testnet"), {
+    const pk = fs.readFileSync("tests/id.json", {
+      encoding: "utf-8",
+    });
+
+    const payer = Keypair.fromSecretKey(Uint8Array.from(JSON.parse(pk)));
+    const connection = new Connection(clusterApiUrl("devnet"), {
       commitment: "confirmed",
     });
-    const fromAirDropSignature = await connection.requestAirdrop(
-      to,
-      1 * LAMPORTS_PER_SOL
+    const transaction = new Transaction().add(
+      SystemProgram.transfer({
+        fromPubkey: payer.publicKey,
+        toPubkey: to,
+        lamports: amt === 1 ? 1.3 * LAMPORTS_PER_SOL : 0.3 * LAMPORTS_PER_SOL, // number of SOL to send
+      })
     );
-    await connection.confirmTransaction(fromAirDropSignature);
-    console.log("🪂 airdropped!", fromAirDropSignature);
+
+    // Sign transaction, broadcast, and confirm
+    const signature = await sendAndConfirmTransaction(
+      connection,
+      transaction,
+      [payer],
+      {
+        commitment: "confirmed",
+      }
+    );
+
+    console.log("🪂 airdropped!", signature);
   } catch (er) {
     console.log("Error Here: " + er);
   }
@@ -70,3 +93,5 @@ export const verifyAmount = async (connection, ata, expectedAmount) => {
 export const calculateCutWithBps = (amount, bps) => {
   return amount * (bps / 10000);
 };
+
+export const CANDY_BOX_V1 = "CD8QX7UQSSHWzKbZbMGVbqVnGqiJWqupjdDMHwyvchbR";
