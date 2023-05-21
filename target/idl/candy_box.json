@@ -1,0 +1,550 @@
+{
+  "version": "0.1.0",
+  "name": "candy_box",
+  "instructions": [
+    {
+      "name": "createSubscription",
+      "accounts": [
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "subscriptionVault",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "candyTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "subscriptionAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "merchant",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "signer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "candyBankWallet",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "candyPayer",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "systemProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "args",
+          "type": {
+            "defined": "CreateSubscriptionArgs"
+          }
+        }
+      ]
+    },
+    {
+      "name": "withdrawRemaining",
+      "accounts": [
+        {
+          "name": "subscriptionAccount",
+          "isMut": false,
+          "isSigner": false,
+          "relations": [
+            "associated_vault",
+            "mint"
+          ]
+        },
+        {
+          "name": "associatedVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "userAta",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "userPubkey",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "amount",
+          "type": "u64"
+        }
+      ]
+    },
+    {
+      "name": "disburse",
+      "accounts": [
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "subscriptionVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "thread",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "candyTokenAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "candyBankWalletAta",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "subscriptionAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "merchantAta",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "signer",
+          "isMut": false,
+          "isSigner": true
+        },
+        {
+          "name": "threadProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": [
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          }
+        }
+      ]
+    },
+    {
+      "name": "cancelSubscription",
+      "accounts": [
+        {
+          "name": "mint",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "subscriptionVault",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "subscriptionAccount",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "merchantAta",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "userPubkey",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "userAta",
+          "isMut": true,
+          "isSigner": false
+        },
+        {
+          "name": "signerAta",
+          "isMut": true,
+          "isSigner": false,
+          "relations": [
+            "owner"
+          ]
+        },
+        {
+          "name": "owner",
+          "isMut": true,
+          "isSigner": true
+        },
+        {
+          "name": "tokenProgram",
+          "isMut": false,
+          "isSigner": false
+        },
+        {
+          "name": "associatedTokenProgram",
+          "isMut": false,
+          "isSigner": false
+        }
+      ],
+      "args": []
+    }
+  ],
+  "accounts": [
+    {
+      "name": "Subscription",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "subscriber",
+            "type": "publicKey"
+          },
+          {
+            "name": "associatedVault",
+            "type": "publicKey"
+          },
+          {
+            "name": "merchant",
+            "type": "publicKey"
+          },
+          {
+            "name": "mint",
+            "type": "publicKey"
+          },
+          {
+            "name": "initializationTime",
+            "type": "u64"
+          },
+          {
+            "name": "terminationTime",
+            "type": {
+              "option": "u64"
+            }
+          },
+          {
+            "name": "lastUpdateTimestamp",
+            "type": "u64"
+          },
+          {
+            "name": "candyPayer",
+            "type": "publicKey"
+          },
+          {
+            "name": "candyCut",
+            "docs": [
+              "fee percentage 1% = 100Bps,",
+              "enter Bps value here"
+            ],
+            "type": "u32"
+          },
+          {
+            "name": "candyBankWallet",
+            "type": "publicKey"
+          },
+          {
+            "name": "active",
+            "type": "bool"
+          },
+          {
+            "name": "bump",
+            "type": "u8"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "interval",
+            "type": "u64"
+          }
+        ]
+      }
+    }
+  ],
+  "types": [
+    {
+      "name": "CreateSubscriptionArgs",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "id",
+            "type": {
+              "array": [
+                "u8",
+                32
+              ]
+            }
+          },
+          {
+            "name": "initializationTime",
+            "type": "u64"
+          },
+          {
+            "name": "interval",
+            "type": "u64"
+          },
+          {
+            "name": "price",
+            "type": "u64"
+          },
+          {
+            "name": "candyCut",
+            "type": "u32"
+          }
+        ]
+      }
+    },
+    {
+      "name": "FeeConfig",
+      "type": {
+        "kind": "struct",
+        "fields": [
+          {
+            "name": "feeNumerator",
+            "type": "u32"
+          },
+          {
+            "name": "feeDenominator",
+            "type": "u32"
+          }
+        ]
+      }
+    }
+  ],
+  "events": [
+    {
+      "name": "SubscriptionCreated",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "subscriber",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "associatedVault",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "merchant",
+          "type": "publicKey",
+          "index": false
+        },
+        {
+          "name": "initializationTime",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "terminationTime",
+          "type": {
+            "option": "u64"
+          },
+          "index": false
+        },
+        {
+          "name": "lastUpdateTimestamp",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "active",
+          "type": "bool",
+          "index": false
+        },
+        {
+          "name": "price",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "interval",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "SubscriptionCancelled",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "i64",
+          "index": false
+        }
+      ]
+    },
+    {
+      "name": "Disbursed",
+      "fields": [
+        {
+          "name": "id",
+          "type": {
+            "array": [
+              "u8",
+              32
+            ]
+          },
+          "index": false
+        },
+        {
+          "name": "timestamp",
+          "type": "i64",
+          "index": false
+        },
+        {
+          "name": "vaultBalance",
+          "type": "u64",
+          "index": false
+        },
+        {
+          "name": "subscriptionPrice",
+          "type": "u64",
+          "index": false
+        }
+      ]
+    }
+  ],
+  "errors": [
+    {
+      "code": 6000,
+      "name": "AssociatedTokenAccountNotAuthorised",
+      "msg": "ATA not owned by user or merchant"
+    },
+    {
+      "code": 6001,
+      "name": "AssociatedTokenAccountInvalidMint",
+      "msg": "ATA mint invalid"
+    },
+    {
+      "code": 6002,
+      "name": "VaultOwnerMisMatch",
+      "msg": "Owner of this vault is not the pda entered"
+    },
+    {
+      "code": 6003,
+      "name": "InvalidMint",
+      "msg": "Mint given is not matching mint of account"
+    },
+    {
+      "code": 6004,
+      "name": "ATAMismatch",
+      "msg": "Owner of ATA is not owner set in account"
+    },
+    {
+      "code": 6005,
+      "name": "SubscriptionInActive",
+      "msg": "Subscription is not active"
+    },
+    {
+      "code": 6006,
+      "name": "InvalidOrUnrelatedSubscriber",
+      "msg": "Invalid or unrelated subsriber"
+    },
+    {
+      "code": 6007,
+      "name": "InsufficientWithdrawableAmount",
+      "msg": "Insufficient funds to withdraw"
+    },
+    {
+      "code": 6008,
+      "name": "FailedToCast",
+      "msg": "Math Error: Casting Failure"
+    },
+    {
+      "code": 6009,
+      "name": "MathOverflow",
+      "msg": "Math Error: arithmetic overflow!"
+    }
+  ],
+  "metadata": {
+    "address": "CD8QX7UQSSHWzKbZbMGVbqVnGqiJWqupjdDMHwyvchbR"
+  }
+}

@@ -9,3 +9,7 @@ test-ledger
 .pnp.loader.mjs
 .prettierignore
 wallets/
+
+!target/idl/candy_box.json
+
+!.gitignore
