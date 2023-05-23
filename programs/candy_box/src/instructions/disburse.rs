@@ -85,7 +85,10 @@ pub fn handler(ctx: Context<Disburse>, id: [u8;32] ) -> Result<ThreadResponse> {
             "payment not yet due"
         );
     }
-    assert!(ctx.accounts.subscription_vault.amount > price, "Not enough balance in user vault");
+    if let Some(termination_time) = subscription_account.termination_time{
+        assert!(clock.unix_timestamp < termination_time.try_into().unwrap() ,"Subscription Over");
+    }
+    assert!(ctx.accounts.subscription_vault.amount >= price, "Not enough balance in user vault");
     // assert!(user_pubkey.clone() == subscription_account.subscriber, "user mistmatch");
     
     // Death valley starts here

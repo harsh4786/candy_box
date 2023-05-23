@@ -61,6 +61,7 @@ pub struct CreateSubscriptionArgs{
     pub interval: u64,
     pub price: u64,
     pub candy_cut: u32,
+    pub termination_time: Option<u64>
 }
 pub fn handler(
     ctx: Context<CreateSubscription>,
@@ -71,13 +72,16 @@ pub fn handler(
         initialization_time,
         interval,
         price,
-        candy_cut
+        candy_cut,
+        termination_time
     } = args;
     let subscription_acc = &mut ctx.accounts.subscription_account;
     let candy_token_account = &mut ctx.accounts.candy_token_account;
     assert!(candy_cut > 1,"candy cut too low");
     subscription_acc.subscriber = ctx.accounts.signer.key();
-    subscription_acc.termination_time = None;
+    if let Some(termination_time) = termination_time {
+        subscription_acc.termination_time = Some(termination_time);
+    }
     subscription_acc.initialization_time = initialization_time;
     subscription_acc.interval = interval;
     subscription_acc.price = price;

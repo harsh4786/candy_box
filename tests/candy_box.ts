@@ -184,12 +184,14 @@ describe("candy_box", () => {
   });
   it("User creates subscription for 1 year", async () => {
     let initializationTime = new anchor.BN(Date.now() / 1000);
+    let terminationTime = new anchor.BN(Date.now() / 1000 + 60 * 60 * 24 * 365);
     let args = {
       id: [...Uint8Array.from(id)],
       initializationTime,
       interval,
       price,
       candyCut,
+      terminationTime,
     };
     const tx = await program.methods
       .createSubscription(args)
